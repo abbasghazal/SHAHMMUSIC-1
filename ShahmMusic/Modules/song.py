@@ -1,6 +1,4 @@
-
 import os
-
 import requests
 import yt_dlp
 from pyrogram import filters
@@ -10,6 +8,9 @@ from youtube_search import YoutubeSearch
 
 from ShahmMusic import BOT_MENTION, BOT_USERNAME, LOGGER, app
 
+# مسار مجلد الكوكيز وملف الكوكيز
+COOKIES_DIR = "cookies"
+COOKIES_FILE = os.path.join(COOKIES_DIR, "cookies.txt")
 
 @app.on_message(filters.command(["song", "vsong", "video", "music"]) | filters.command(["بحث","تنزيل","نزل"],prefixes= ["/", "!","","#"]))
 async def song(_, message: Message):
@@ -20,7 +21,20 @@ async def song(_, message: Message):
     m = await message.reply_text("⌔︙ جارٍ التحميل...")
 
     query = "".join(" " + str(i) for i in message.command[1:])
-    ydl_opts = {"format": "bestaudio[ext=m4a]"}
+    
+    # إعدادات yt-dlp مع استخدام الكوكيز إذا كان الملف موجوداً
+    ydl_opts = {
+        "format": "bestaudio[ext=m4a]",
+        "quiet": True,
+    }
+    
+    # إضافة خيار الكوكيز إذا كان الملف موجوداً
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts["cookiefile"] = COOKIES_FILE
+        LOGGER.info(f"Using cookies from: {COOKIES_FILE}")
+    else:
+        LOGGER.warning(f"Cookies file not found at: {COOKIES_FILE}. Proceeding without cookies.")
+    
     try:
         results = YoutubeSearch(query, max_results=5).to_dict()
         link = f"https://youtube.com{results[0]['url_suffix']}"
@@ -88,8 +102,9 @@ async def song(_, message: Message):
                 reply_markup=start_butt,
             )
         await m.delete()
-    except:
-        return await m.edit_text("فشل تحميل الصوت على الخادم")
+    except Exception as e:
+        LOGGER.error(f"Download failed: {e}")
+        return await m.edit_text(f"فشل تحميل الصوت على الخادم\n\n**السبب:** `{e}`")
 
     try:
         os.remove(audio_file)
